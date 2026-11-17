@@ -1,19 +1,22 @@
 "use strict";
 
 // VR Clinic Explorer
-// AI module owner: Islamiya Okassova, 242322
+// Module owner: Islamiya Okassova, 242322
 //
-// Stage 1: semantic question matching and text interaction.
-// Speech recognition will be added in the next development stage.
+// Features:
+// - Semantic topic matching with a pretrained MiniLM model.
+// - Text questions and optional English speech recognition.
+// - Manual topic selection when AI or voice is unavailable.
+// - Shared responses for desktop and VR.
 //
-// Reference:
+// References:
 // https://huggingface.co/docs/transformers.js/v2.17.2/en/api/pipelines
-// Model:
 // https://huggingface.co/Xenova/all-MiniLM-L6-v2
+// https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition
 //
-// The model creates sentence embeddings.
-// Prepared answers are selected using semantic similarity.
-// We do not train or fine-tune the pretrained model here.
+// The pretrained model produces sentence embeddings.
+// We compare embeddings and select a prepared educational answer.
+// No model training or fine-tuning is performed here.
 
 (() => {
   const LIBRARY_URL =
@@ -22,12 +25,15 @@
   const MODEL_ID = "Xenova/all-MiniLM-L6-v2";
   const MODEL_REVISION = "main";
 
-  // Initial development settings, not validated accuracy claims.
-  // Tune using development questions, then evaluate on separate questions.
+  // Initial development thresholds.
+  // Validate them using separate development and evaluation questions.
+  // Similarity is not a probability or an accuracy percentage.
   const MIN_SIMILARITY = 0.45;
   const MIN_MARGIN = 0.06;
+
   const MAX_QUESTION_LENGTH = 250;
-  const WAIT_LIMIT_MS = 90000;
+  const MODEL_WAIT_LIMIT_MS = 90000;
+  const VOICE_WAIT_LIMIT_MS = 25000;
 
   const TOPICS = {
     stethoscope: {
@@ -87,6 +93,12 @@
   let busy = false;
   let uiReady = false;
 
+  // Prevent an older AI response from replacing a newer manual choice.
+  let responseVersion = 0;
+
+  let voiceSession = null;
+  let voiceNoticeAccepted = false;
+
   const byId = id => document.getElementById(id);
 
   function display(message) {
@@ -121,7 +133,7 @@
       })
     );
 
-    // Do not log the user's question or personal information.
+    // Never log the question, transcript, or personal information.
     console.info("[ClinicGuide]", {
       status: result.status,
       topic: result.topic,
@@ -137,13 +149,12 @@
     busy = value;
 
     const askButton = byId("askButton");
+    const response = byId("aiResponse");
 
     if (askButton) {
       askButton.disabled = value;
       askButton.textContent = value ? "Please wait..." : "Ask";
     }
-
-    const response = byId("aiResponse");
 
     if (response) {
       response.setAttribute("aria-busy", String(value));
@@ -178,10 +189,10 @@
       loadingPromise = (async () => {
         const { pipeline, env } = await import(LIBRARY_URL);
 
-        // This static website downloads model files from Hugging Face.
         env.allowLocalModels = false;
 
-        // A single thread works without cross-origin isolation headers.
+        // Static hosting does not require cross-origin isolation
+        // when the WASM runtime uses a single thread.
         env.backends.onnx.wasm.numThreads = 1;
 
         const loadedExtractor = await pipeline(
@@ -213,7 +224,7 @@
   }
 
   async function init() {
-    await withTimeLimit(loadModel(), WAIT_LIMIT_MS);
+    await withTimeLimit(loadModel(), MODEL_WAIT_LIMIT_MS);
 
     return {
       status: "ready",
@@ -244,7 +255,7 @@
     );
 
     EXAMPLE_ITEMS.forEach((item, index) => {
-      // Normalized embeddings: dot product equals cosine similarity.
+      // For normalized vectors, this is cosine similarity.
       const similarity = dotProduct(
         questionVector,
         exampleVectors[index]
@@ -279,6 +290,8 @@
   }
 
   async function ask(rawQuestion) {
+    stopListening(false);
+
     if (busy) {
       return {
         status: "busy",
@@ -288,6 +301,7 @@
     }
 
     const question = String(rawQuestion ?? "").trim();
+    const thisVersion = ++responseVersion;
 
     if (!question) {
       return publishResult({
@@ -318,49 +332,77 @@
           "You can also use the topic buttons below."
         );
       } else {
-        publishStatus("thinking", "Thinking about your question...");
+        publishStatus(
+          "thinking",
+          "Thinking about your question..."
+        );
       }
 
       await init();
 
-      // Keep inference serialized. A second question cannot start
-      // until this one has completed.
-      const result = await classify(question);
+      // A manual choice made during loading takes priority.
+      if (thisVersion !== responseVersion) {
+        return {
+          status: "superseded",
+          topic: null,
+          answer: ""
+        };
+      }
 
-      return publishResult({
-        ...result,
+      // Serialize model inference: do not run two questions together.
+      const classified = await classify(question);
+
+      const result = {
+        ...classified,
         elapsedMs: Math.round(performance.now() - startedAt)
-      });
+      };
+
+      if (thisVersion !== responseVersion) {
+        return {
+          ...result,
+          status: "superseded"
+        };
+      }
+
+      return publishResult(result);
     } catch (error) {
-      // Log only a short error identifier, never the question.
       console.warn(
         "[ClinicGuide] Model unavailable:",
         error?.name || "Error"
       );
 
-      return publishResult({
+      const result = {
         status: "unavailable",
         topic: null,
         answer:
           "The AI guide is unavailable or is still downloading. " +
           "Please choose a topic below, or try Ask again later.",
         elapsedMs: Math.round(performance.now() - startedAt)
-      });
+      };
+
+      if (thisVersion !== responseVersion) {
+        return {
+          ...result,
+          status: "superseded"
+        };
+      }
+
+      return publishResult(result);
     } finally {
       setBusy(false);
     }
   }
 
   function chooseTopic(topic) {
-    if (busy) {
-      // The manual alternative should remain usable during loading.
-      // Its result is explicitly marked as manual, not AI.
-      display(TOPICS[topic]?.answer || UNKNOWN_ANSWER);
-    }
-
     if (!Object.prototype.hasOwnProperty.call(TOPICS, topic)) {
       return null;
     }
+
+    stopListening(false);
+
+    // Invalidate a pending AI response without pretending
+    // that the underlying inference has been cancelled.
+    responseVersion += 1;
 
     return publishResult({
       status: "manual",
@@ -371,12 +413,279 @@
     });
   }
 
-  function showVoiceDevelopmentNotice() {
+  function updateVoiceButton(active) {
+    const button = byId("micButton");
+
+    if (button) {
+      button.textContent = active ? "Cancel voice" : "Speak";
+      button.setAttribute("aria-pressed", String(active));
+    }
+  }
+
+  function releaseVoiceSession(session) {
+    clearTimeout(session.timer);
+
+    if (voiceSession === session) {
+      voiceSession = null;
+      updateVoiceButton(false);
+    }
+  }
+
+  function stopListening(showMessage = true) {
+    const session = voiceSession;
+
+    if (!session) {
+      return;
+    }
+
+    // Ignore delayed results after cancellation.
+    session.finished = true;
+    releaseVoiceSession(session);
+
+    try {
+      session.recognition.abort();
+    } catch {
+      // Recognition may already have ended.
+    }
+
+    if (showMessage) {
+      publishStatus(
+        "voice_cancelled",
+        "Voice input stopped. You can type your question or try again."
+      );
+    }
+  }
+
+  function startListening() {
+    // A second activation cancels the current voice session.
+    if (voiceSession) {
+      stopListening();
+      return;
+    }
+
+    if (busy) {
+      return;
+    }
+
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      publishStatus(
+        "voice_unsupported",
+        "Voice input is not supported in this browser. " +
+        "Please type your question or choose a topic."
+      );
+      return;
+    }
+
+    if (!window.isSecureContext) {
+      publishStatus(
+        "voice_insecure",
+        "Voice input needs HTTPS or a local development server. " +
+        "You can still type your question."
+      );
+      return;
+    }
+
+    // Explain external speech processing before asking for access.
+    // This choice is kept in memory only for the current page visit.
+    if (!voiceNoticeAccepted) {
+      const accepted = window.confirm(
+        "Optional microphone access\n\n" +
+        "Your browser's speech service may send audio to an external " +
+        "server to turn your speech into text.\n\n" +
+        "Our application does not save your audio or questions. " +
+        "Please do not say names or personal medical information.\n\n" +
+        "Choose OK to continue, or Cancel to use text input."
+      );
+
+      if (!accepted) {
+        publishStatus(
+          "voice_declined",
+          "Microphone access was not requested. " +
+          "Please type your question or choose a topic."
+        );
+        return;
+      }
+
+      voiceNoticeAccepted = true;
+    }
+
+    let recognition;
+
+    try {
+      recognition = new SpeechRecognition();
+    } catch {
+      publishStatus(
+        "voice_unavailable",
+        "Voice input could not start. Please use text input."
+      );
+      return;
+    }
+
+    recognition.lang = "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    const session = {
+      recognition,
+      finished: false,
+      timer: null
+    };
+
+    voiceSession = session;
+    updateVoiceButton(true);
+
+    function fail(status, message) {
+      if (session.finished || voiceSession !== session) {
+        return;
+      }
+
+      session.finished = true;
+      releaseVoiceSession(session);
+
+      try {
+        recognition.abort();
+      } catch {
+        // Recognition may already have stopped.
+      }
+
+      publishStatus(status, message);
+    }
+
+    recognition.onstart = () => {
+      if (session.finished || voiceSession !== session) {
+        return;
+      }
+
+      publishStatus(
+        "listening",
+        "Listening... Ask one short question in English. " +
+        "Press Cancel voice to stop."
+      );
+    };
+
+    recognition.onresult = event => {
+      if (session.finished || voiceSession !== session) {
+        return;
+      }
+
+      const transcript =
+        event.results[event.resultIndex]?.[0]?.transcript?.trim() || "";
+
+      session.finished = true;
+      releaseVoiceSession(session);
+
+      try {
+        recognition.abort();
+      } catch {
+        // Recognition may already have stopped.
+      }
+
+      if (!transcript) {
+        publishStatus(
+          "voice_no_text",
+          "I could not hear a question. Please try again or type it."
+        );
+        return;
+      }
+
+      const input = byId("questionInput");
+
+      if (input) {
+        input.value = transcript;
+      }
+
+      // Use exactly the same AI pipeline as typed questions.
+      // Do not store or log the transcript.
+      void ask(transcript);
+    };
+
+    recognition.onerror = event => {
+      const messages = {
+        "not-allowed":
+          "Microphone access was not allowed. " +
+          "You can type your question or choose a topic.",
+
+        "service-not-allowed":
+          "The browser's speech service is not allowed. " +
+          "Please use text input.",
+
+        "audio-capture":
+          "No working microphone was available. " +
+          "Check your microphone or use text input.",
+
+        "no-speech":
+          "No speech was detected. " +
+          "Please try again or type your question.",
+
+        "network":
+          "The speech service could not connect. " +
+          "Please type your question or choose a topic.",
+
+        "language-not-supported":
+          "English speech recognition is unavailable in this browser. " +
+          "Please use text input.",
+
+        "aborted":
+          "Voice input stopped. You can type your question."
+      };
+
+      fail(
+        "voice_error",
+        messages[event.error] ||
+          "Voice recognition failed. Please try text input."
+      );
+    };
+
+    recognition.onnomatch = () => {
+      fail(
+        "voice_no_match",
+        "The speech service could not understand the question. " +
+        "Please try again or type it."
+      );
+    };
+
+    recognition.onend = () => {
+      if (session.finished || voiceSession !== session) {
+        return;
+      }
+
+      session.finished = true;
+      releaseVoiceSession(session);
+
+      publishStatus(
+        "voice_no_result",
+        "Voice input ended without a question. " +
+        "Please try again or type your question."
+      );
+    };
+
     publishStatus(
-      "voice_not_added",
-      "Voice input will be added in the next development stage. " +
-      "Please type your question or choose a topic."
+      "voice_starting",
+      "Starting the microphone. Allow access if your browser asks, " +
+      "then wait for Listening."
     );
+
+    session.timer = setTimeout(() => {
+      fail(
+        "voice_timeout",
+        "Voice input timed out and stopped. " +
+        "Please try again or type your question."
+      );
+    }, VOICE_WAIT_LIMIT_MS);
+
+    try {
+      recognition.start();
+    } catch {
+      fail(
+        "voice_start_failed",
+        "The microphone could not start. " +
+        "Try the Speak button with a mouse click or use text input."
+      );
+    }
   }
 
   function addManualTopics() {
@@ -445,6 +754,13 @@
           void ask(input.value);
         }
       });
+
+      // Typing takes priority over an active voice session.
+      input.addEventListener("input", () => {
+        if (voiceSession) {
+          stopListening();
+        }
+      });
     }
 
     if (askButton && input) {
@@ -454,39 +770,50 @@
     }
 
     if (micButton) {
-      micButton.addEventListener(
-        "click",
-        showVoiceDevelopmentNotice
-      );
+      micButton.addEventListener("click", startListening);
+      micButton.setAttribute("aria-pressed", "false");
     }
 
     if (privacyNotice) {
       privacyNotice.textContent =
         "Text questions are processed by an AI model in this browser. " +
         "Model and library files are downloaded from external hosts. " +
-        "This module does not save or send your typed questions. " +
-        "Please do not enter names or personal medical information. " +
-        "Voice input is not enabled in this development version. " +
-        "This tour is educational and does not replace a doctor.";
+        "The microphone is optional. Your browser's speech service " +
+        "may send audio to an external server for recognition. " +
+        "This application does not save your audio or questions. " +
+        "Please do not share names or personal medical information. " +
+        "This educational tour does not replace a doctor.";
     }
 
     addManualTopics();
 
     display(
       "Ask in English about a stethoscope, a thermometer, " +
-      "or a regular check-up. The AI loads when you first press Ask."
+      "or a regular check-up. Type a question or press Speak. " +
+      "The AI loads when you first ask a question."
     );
   }
 
   window.ClinicGuide = {
     init,
     ask,
-    chooseTopic
+    chooseTopic,
+    startListening,
+    stopListening
   };
 
-  // Compatibility with Amina's existing scene.js.
-  // Replace this development notice with speech recognition next.
-  window.startVoiceQuestion = showVoiceDevelopmentNotice;
+  // Amina's scene.js calls this function from the VR voice button.
+  window.startVoiceQuestion = startListening;
+
+  window.addEventListener("pagehide", () => {
+    stopListening(false);
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopListening();
+    }
+  });
 
   if (document.readyState === "loading") {
     document.addEventListener(
