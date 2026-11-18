@@ -1,10 +1,11 @@
+
 "use strict";
 
 // VR Clinic Explorer
 // AI module owner: Islamiya Okassova, 242322
 //
 // Stage 1: semantic question matching and text interaction.
-// Speech recognition will be added in the next development stage.
+// Voice recognition uses Web Speech API when supported.
 //
 // Reference:
 // https://huggingface.co/docs/transformers.js/v2.17.2/en/api/pipelines
@@ -371,12 +372,79 @@
     });
   }
 
-  function showVoiceDevelopmentNotice() {
-    publishStatus(
-      "voice_not_added",
-      "Voice input will be added in the next development stage. " +
-      "Please type your question or choose a topic."
-    );
+  let speechRecognition = null;
+
+  function startVoiceQuestion() {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      publishStatus(
+        "voice_unsupported",
+        "Voice is not supported here. Please type a question or choose a topic."
+      );
+      return;
+    }
+
+    if (speechRecognition) {
+      publishStatus(
+        "voice_busy",
+        "The microphone is already listening."
+      );
+      return;
+    }
+
+    // A browser may send speech audio to an external service.
+    // Permission is requested only after the visitor starts voice input.
+    const recognition = new SpeechRecognition();
+    speechRecognition = recognition;
+
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+
+    recognition.onresult = event => {
+      const spoken = event.results?.[0]?.[0]?.transcript?.trim();
+
+      if (spoken) {
+        const input = byId("questionInput");
+        if (input) input.value = spoken;
+        void ask(spoken);
+      } else {
+        publishStatus(
+          "no_speech",
+          "I could not hear that. Please try text or a topic button."
+        );
+      }
+    };
+
+    recognition.onerror = event => {
+      publishStatus(
+        "voice_error",
+        "Voice unavailable (" +
+          String(event.error || "error") +
+          "). Please use text or a topic button."
+      );
+    };
+
+    recognition.onend = () => {
+      speechRecognition = null;
+    };
+
+    try {
+      recognition.start();
+      publishStatus(
+        "listening",
+        "Listening... Please ask one short question in English."
+      );
+    } catch (error) {
+      speechRecognition = null;
+      publishStatus(
+        "voice_error",
+        "Microphone could not start. Please type or choose a topic."
+      );
+    }
   }
 
   function addManualTopics() {
@@ -454,10 +522,7 @@
     }
 
     if (micButton) {
-      micButton.addEventListener(
-        "click",
-        showVoiceDevelopmentNotice
-      );
+      micButton.addEventListener("click", startVoiceQuestion);
     }
 
     if (privacyNotice) {
@@ -466,7 +531,8 @@
         "Model and library files are downloaded from external hosts. " +
         "This module does not save or send your typed questions. " +
         "Please do not enter names or personal medical information. " +
-        "Voice input is not enabled in this development version. " +
+        "Voice input requires permission; browser speech services may " +
+        "process audio outside the device. " +
         "This tour is educational and does not replace a doctor.";
     }
 
@@ -484,9 +550,7 @@
     chooseTopic
   };
 
-  // Compatibility with Amina's existing scene.js.
-  // Replace this development notice with speech recognition next.
-  window.startVoiceQuestion = showVoiceDevelopmentNotice;
+  window.startVoiceQuestion = startVoiceQuestion;
 
   if (document.readyState === "loading") {
     document.addEventListener(

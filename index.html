@@ -3,691 +3,204 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VR Clinic Explorer</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11667e">
+  <title>VR Clinic Explorer | Children's Virtual Clinic</title>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.7.0/dist/aframe-extras.min.js"></script>
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #eaf4f8;
-    }
-
-    #interface {
-      position: fixed;
-      top: 16px;
-      left: 16px;
-      z-index: 10;
-      width: min(350px, calc(100vw - 32px));
-      max-height: calc(100vh - 32px);
-      overflow-y: auto;
-      padding: 19px;
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 16px;
-      box-shadow: 0 5px 24px rgba(25, 65, 85, 0.16);
-    }
-
-    h1 {
-      margin: 0 0 6px;
-      font-size: 22px;
-      color: #176c86;
-    }
-
-    h2 {
-      margin: 16px 0 8px;
-      font-size: 15px;
-      color: #176c86;
-    }
-
-    #stageTitle {
-      margin: 8px 0;
-      font-size: 16px;
-      font-weight: bold;
-      color: #25859b;
-    }
-
-    #description, #aiResponse {
-      font-size: 13px;
-      line-height: 1.6;
-      color: #355466;
-    }
-
-    .controls {
-      display: flex;
-      gap: 8px;
-      margin-top: 13px;
-    }
-
-    button {
-      flex: 1;
-      padding: 11px;
-      border: none;
-      border-radius: 8px;
-      background: #20859e;
-      color: #fff;
-      font-size: 13px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    input {
-      width: 100%;
-      padding: 11px;
-      margin-top: 8px;
-      border: 1px solid #bdd8df;
-      border-radius: 8px;
-      font-size: 13px;
-    }
-
-    #aiResponse {
-      margin-top: 12px;
-      padding: 10px;
-      background: #edf7f9;
-      border-radius: 8px;
-    }
-
-    #privacyNotice {
-      margin-top: 12px;
-      font-size: 11px;
-      line-height: 1.5;
-      color: #587482;
-    }
-
-
-
-    @media (max-width: 600px) {
-      #interface {
-        width: min(290px, calc(100vw - 20px));
-        top: 10px;
-        left: 10px;
-      }
-
-    
-    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px/1.45 Arial, Helvetica, sans-serif; background: #cde5e9; }
+    #interface { position: fixed; z-index: 11; top: 14px; left: 14px; width: min(345px, calc(100vw - 28px)); max-height: calc(100vh - 28px); overflow-y: auto; background: #fff; color: #23445a; padding: 19px; border-radius: 16px; box-shadow: 0 8px 30px #173d4a35; }
+    h1 { font-size: 23px; line-height: 1.2; margin: 3px 0 9px; color: #0c647b; }
+    h2 { font-size: 15px; margin: 16px 0 9px; color: #0c647b; }
+    #stageTitle { font-size: 17px; font-weight: 700; color: #175f78; }
+    #description { margin: 9px 0; }
+    #stepCount { float: right; color: #537b8b; font-weight: 700; }
+    .controls { display: flex; gap: 8px; margin-top: 10px; }
+    button { flex: 1; padding: 11px 7px; color: white; background: #187c93; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; }
+    button:hover { background: #13677b; }
+    button:disabled { opacity: .4; cursor: default; }
+    input { padding: 11px; border: 1px solid #aeced8; border-radius: 8px; width: 100%; font-size: 14px; }
+    #aiResponse, #taskStatus { margin-top: 12px; padding: 11px; border-radius: 9px; background: #eaf6f8; color: #274e63; }
+    #taskStatus { background: #fff4df; border-left: 3px solid #d38e28; }
+    #privacyNotice { font-size: 11px; color: #4d6571; line-height: 1.5; margin-top: 13px; }
+    .small { font-size: 12px; color: #637783; }
+    @media (max-width: 640px) { #interface { width: min(290px, calc(100vw - 16px)); top: 8px; left: 8px; padding: 12px; } }
   </style>
 </head>
-
 <body>
-
-  <div id="interface">
+  <aside id="interface" aria-label="Clinic controls">
+    <div class="small">A friendly virtual visit · ages 4–10</div>
     <h1>VR Clinic Explorer</h1>
+    <span id="stepCount">1 / 3</span><div id="stageTitle">Welcome</div>
+    <p id="description">Learn what happens at a friendly doctor's visit.</p>
+    <div id="taskStatus" role="status" aria-live="polite">Look at CHECK IN to begin.</div>
+    <div class="controls"><button id="backButton" disabled>Back</button><button id="nextButton">Next</button></div>
+    <h2>Ask your clinic guide</h2>
+    <input id="questionInput" type="text" maxlength="250" placeholder="What is a stethoscope?" aria-label="Ask a question">
+    <div class="controls"><button id="askButton">Ask</button><button id="micButton">Speak</button></div>
+    <div id="aiResponse" role="status" aria-live="polite">Ask about a check-up, stethoscope or thermometer.</div>
+    <p id="privacyNotice">The AI model runs in this browser after downloading model files. Microphone access is optional; the browser's speech service may send audio to a provider. Please do not share private medical details.</p>
+  </aside>
 
-    <div id="stageTitle">Welcome</div>
-
-    <p id="description">
-      Welcome to our clinic! Take your time and discover
-      what happens during a regular doctor's visit.
-    </p>
-
-    <div class="controls">
-      <button id="backButton" disabled>Back</button>
-      <button id="nextButton">Next</button>
-    </div>
-
-    <h2>Ask the Guide</h2>
-
-    <input
-      id="questionInput"
-      type="text"
-      placeholder="What would you like to know?"
-      aria-label="Your question"
-    >
-
-    <div class="controls">
-      <button id="askButton">Ask</button>
-      <button id="micButton">Speak</button>
-    </div>
-
-    <div id="aiResponse" role="status" aria-live="polite">
-      You can ask about a stethoscope, a thermometer,
-      or a regular check-up.
-    </div>
-
-    <p id="privacyNotice">
-      The microphone is optional. Voice recognition may
-      process audio through your browser's speech service.
-      No personal medical information is needed.
-      This tour is educational and does not replace a doctor.
-    </p>
-  </div>
-
-
-  <a-scene
-    background="color: #DDEFF7"
-    renderer="antialias: true; colorManagement: true"
-    vr-mode-ui="enabled: true"
-  >
-
-    <a-entity
-      light="type: ambient; intensity: 0.8">
-    </a-entity>
-
-    <a-entity
-      light="type: directional; intensity: 0.7"
-      position="-2 5 3">
-    </a-entity>
-
-    <a-plane
-      position="0 0 0"
-      rotation="-90 0 0"
-      width="12"
-      height="12"
-      color="#CBE4DC">
-    </a-plane>
-
-    <a-box
-      position="0 2.1 -6"
-      width="12"
-      height="4.2"
-      depth="0.12"
-      color="#F1F9FC">
-    </a-box>
-
-    <a-box
-      position="-6 2.1 0"
-      width="0.12"
-      height="4.2"
-      depth="12"
-      color="#E5F3F8">
-    </a-box>
-
-    <a-box
-      position="6 2.1 0"
-      width="0.12"
-      height="4.2"
-      depth="12"
-      color="#E5F3F8">
-    </a-box>
-
-    <a-plane
-      position="0 4.2 0"
-      rotation="90 0 0"
-      width="12"
-      height="12"
-      color="#FFFFFF">
-    </a-plane>
-
-    <a-box
-      position="3.2 2.4 -5.9"
-      width="2.5"
-      height="1.5"
-      depth="0.08"
-      color="#9DD9F0">
-    </a-box>
-
-    <a-box
-      position="3.2 2.4 -5.83"
-      width="0.08"
-      height="1.5"
-      depth="0.08"
-      color="#FFFFFF">
-    </a-box>
-
-    <a-box
-      position="3.2 2.4 -5.82"
-      width="2.5"
-      height="0.08"
-      depth="0.08"
-      color="#FFFFFF">
-    </a-box>
-
-    <a-cylinder
-      position="0 0.03 -2.8"
-      radius="2.2"
-      height="0.06"
-      color="#F5E6CB">
-    </a-cylinder>
+  <a-scene background="color: #E6F5F8" renderer="antialias: true; colorManagement: true" vr-mode-ui="enabled: true">
+    <a-entity light="type: ambient; intensity: 0.95"></a-entity>
+    <a-entity light="type: directional; intensity: 0.75" position="-3 6 2"></a-entity>
+    <a-plane position="0 0 -1" rotation="-90 0 0" width="12" height="12" color="#B8D8D3"></a-plane>
+    <a-plane position="0 4.25 -1" rotation="90 0 0" width="12" height="12" color="#F7FCFD"></a-plane>
+    <a-box position="0 2.13 -6" width="12" height="4.25" depth="0.10" color="#D9EDF1"></a-box>
+    <a-box position="-6 2.13 -1" width="0.1" height="4.25" depth="12" color="#E6F5F8"></a-box>
+    <a-box position="6 2.13 -1" width="0.1" height="4.25" depth="12" color="#E6F5F8"></a-box>
+    <a-box position="0 0.13 -5.91" width="12" height="0.24" depth="0.1" color="#93BFCA"></a-box>
+    <a-box position="0 4.05 -5.9" width="12" height="0.20" depth="0.1" color="#91BBC4"></a-box>
+    <a-box position="-1.95 4.15 -2.7" width="1.7" height="0.06" depth="0.9" color="#FFFFFF"></a-box>
+    <a-box position="2.1 4.15 -2.7" width="1.7" height="0.06" depth="0.9" color="#FFFFFF"></a-box>
 
     <a-entity id="welcomeState" visible="true">
+      <a-plane position="0 2.9 -5.83" width="7.3" height="1.25" color="#FFFFFF"></a-plane>
+      <a-text value="HELLO! WELCOME TO THE CLINIC" position="0 3.1 -5.75" align="center" width="6.8" color="#12657A"></a-text>
+      <a-text value="Say hello, explore and ask questions" position="0 2.62 -5.75" align="center" width="5.4" color="#518A96"></a-text>
 
-      <a-text
-        value="WELCOME TO OUR CLINIC"
-        position="0 3.2 -5.75"
-        align="center"
-        width="6"
-        color="#176C86">
-      </a-text>
+      <a-entity position="-3.55 0 -3.65">
+        <a-box position="0 0.69 0" width="2.15" height="1.38" depth="0.85" color="#65A8B9"></a-box>
+        <a-box position="0 1.41 0" width="2.35" height="0.12" depth="1.03" color="#FAFFFF"></a-box>
+        <a-box position="0 0.65 0.45" width="1.92" height="0.25" depth="0.025" color="#2B7184"></a-box>
+        <a-text value="RECEPTION" position="0 0.65 0.48" width="2.8" align="center" color="#FFFFFF"></a-text>
+        <a-box position="0.65 1.56 -0.22" width="0.55" height="0.37" depth="0.07" color="#294B5B"></a-box>
+        <a-box position="0.65 1.36 -0.19" width="0.45" height="0.04" depth="0.24" color="#A9C7D2"></a-box>
+        <a-box position="-0.6 1.52 -0.12" width="0.28" height="0.08" depth="0.22" color="#FFE4A8"></a-box>
+        <a-plane id="checkIn" class="selectable" data-action="checkin" position="0 1.80 0.48" width="1.25" height="0.38" color="#CE8F36"></a-plane>
+        <a-text value="CHECK IN" position="0 1.80 0.51" width="2.4" align="center" color="#FFFFFF"></a-text>
+      </a-entity>
 
-      <a-text
-        value="Let's discover what a doctor does!"
-        position="0 2.7 -5.73"
-        align="center"
-        width="4.5"
-        color="#477A8B">
-      </a-text>
+      <a-entity position="2.65 0 -3.85">
+        <a-box position="0 0.53 0" width="2.05" height="0.32" depth="0.85" color="#87B7C7"></a-box>
+        <a-box position="0 1.00 -0.33" width="2.05" height="0.85" depth="0.17" color="#79AFBF"></a-box>
+        <a-box position="-0.95 0.73 0" width="0.14" height="0.54" depth="0.85" color="#7AABBA"></a-box>
+        <a-box position="0.95 0.73 0" width="0.14" height="0.54" depth="0.85" color="#7AABBA"></a-box>
+        <a-box position="-0.49 0.77 0" width="0.62" height="0.17" depth="0.55" color="#D6E8EE"></a-box>
+        <a-box position="0.49 0.77 0" width="0.62" height="0.17" depth="0.55" color="#F4D9E3"></a-box>
+        <a-text value="WAITING AREA" position="0 1.76 -0.5" align="center" width="3.0" color="#1A7489"></a-text>
+      </a-entity>
 
-      <a-box
-        position="-3 0.65 -4.2"
-        width="2.4"
-        height="1.3"
-        depth="0.8"
-        color="#A5D4DD">
-      </a-box>
-
-      <a-box
-        position="-3 1.35 -4.2"
-        width="2.6"
-        height="0.12"
-        depth="1"
-        color="#FFFFFF">
-      </a-box>
-
-      <a-text
-        value="RECEPTION"
-        position="-3 1.78 -4.1"
-        align="center"
-        width="3"
-        color="#176C86">
-      </a-text>
-
-      <a-box
-        position="2 0.55 -4"
-        width="2.3"
-        height="0.4"
-        depth="0.85"
-        color="#91BDD2">
-      </a-box>
-
-      <a-box
-        position="2 1.05 -4.35"
-        width="2.3"
-        height="0.75"
-        depth="0.15"
-        color="#91BDD2">
-      </a-box>
-
-      <a-sphere
-        position="-1.3 2.1 -5.6"
-        radius="0.26"
-        color="#F8D17C">
-      </a-sphere>
-
-      <a-sphere
-        position="1.3 2.1 -5.6"
-        radius="0.26"
-        color="#F2ADC6">
-      </a-sphere>
-
+      <a-entity position="0.2 0 -4.30">
+        <a-cylinder position="0 0.027 0" radius="1.18" height="0.055" color="#EDE2CA"></a-cylinder>
+        <a-cylinder position="0 0.55 0" radius="0.33" height="0.08" color="#F4FAFC"></a-cylinder>
+        <a-cylinder position="0 0.27 0" radius="0.07" height="0.55" color="#8EAEBB"></a-cylinder>
+        <a-text value="YOU ARE SAFE TO ASK QUESTIONS" position="0 1.5 -0.4" align="center" width="2.4" color="#1F7385"></a-text>
+      </a-entity>
+      <a-box position="2.9 2.9 -5.86" width="1.4" height="0.96" depth="0.08" color="#FFFFFF"></a-box>
+      <a-text value="1  SAY HELLO\n2  EXPLORE\n3  ASK" position="2.9 2.9 -5.78" align="center" width="1.35" color="#2D7A8C"></a-text>
+      <a-box position="-2.75 2.9 -5.84" width="1.5" height="1.0" depth="0.07" color="#F9DDE9"></a-box>
+      <a-sphere position="-2.95 2.9 -5.72" radius="0.20" color="#F4C76B"></a-sphere>
+      <a-cone position="-2.45 2.80 -5.70" radius-bottom="0.22" height="0.43" color="#6ABBAB"></a-cone>
+      <a-cylinder position="4.50 0.22 -4.5" radius="0.34" height="0.45" color="#E6E8E3"></a-cylinder>
+      <a-cone position="4.50 1.12 -4.5" radius-bottom="0.73" radius-top="0.05" height="1.5" color="#67A890"></a-cone>
     </a-entity>
 
     <a-entity id="examinationState" visible="false">
+      <a-box position="0 2.75 -5.83" width="7.7" height="1.3" depth="0.035" color="#E8FAF6"></a-box>
+      <a-text value="LET'S EXPLORE THE EXAMINATION ROOM" position="0 3.03 -5.74" width="7" align="center" color="#17697B"></a-text>
+      <a-text id="objectInfo" value="Look at a medical tool to explore it." position="0 2.55 -5.72" width="5.7" align="center" wrap-count="45" color="#286A7C"></a-text>
+      <a-text id="toolProgress" value="TOOLS EXPLORED: 0 / 3" position="0 2.08 -5.7" align="center" width="4.3" color="#217D72"></a-text>
 
-      <a-text
-        value="EXAMINATION ROOM"
-        position="0 3.3 -5.75"
-        align="center"
-        width="6"
-        color="#176C86">
-      </a-text>
-
-      <a-entity
-        id="examBed"
-        position="1.7 0 -3.5">
-
-        <a-box
-          class="selectable"
-          data-topic="bed"
-          position="0 0.85 0"
-          width="2.3"
-          height="0.3"
-          depth="1"
-          color="#8FC6D3">
-        </a-box>
-
-        <a-box
-          position="0 0.55 0"
-          width="2.1"
-          height="0.6"
-          depth="0.8"
-          color="#F5F8FA">
-        </a-box>
-
-        <a-box
-          position="-0.8 1.05 0"
-          width="0.5"
-          height="0.12"
-          depth="0.7"
-          color="#FFFFFF">
-        </a-box>
-
-        <a-text
-          value="Examination Bed"
-          position="0 1.55 0"
-          align="center"
-          width="3"
-          color="#17566B">
-        </a-text>
-
+      <a-entity position="-2.65 0 -3.75">
+        <a-box position="0 0.78 0" width="2.2" height="0.14" depth="1.04" color="#E4BE94"></a-box>
+        <a-box position="-0.93 0.38 0" width="0.09" height="0.75" depth="0.09" color="#F5F9FA"></a-box>
+        <a-box position="0.93 0.38 0" width="0.09" height="0.75" depth="0.09" color="#F5F9FA"></a-box>
+        <a-text value="LOOK AT THE TOOLS" position="0 1.78 -0.32" width="3.4" align="center" color="#14667B"></a-text>
+        <a-entity id="stethoscope" position="-0.59 1.10 0.12">
+          <a-torus radius="0.20" radius-tubular="0.033" rotation="90 0 0" color="#284C5A"></a-torus>
+          <a-cylinder position="0 -0.23 0" radius="0.04" height="0.33" color="#819EAB"></a-cylinder>
+          <a-sphere position="0 -0.42 0" radius="0.1" color="#C0D3D9"></a-sphere>
+          <a-box class="selectable" data-topic="stethoscope" position="0 0 0.05" width="0.65" height="0.9" depth="0.50" material="color:#FFFFFF; opacity:0.01; transparent:true; depthWrite:false"></a-box>
+          <a-text value="HEART" position="0 0.60 0.10" align="center" width="1.75" color="#1B7188"></a-text>
+        </a-entity>
+        <a-entity id="thermometer" position="0.57 1.13 0.12">
+          <a-box width="0.16" height="0.57" depth="0.12" color="#FAFFFF"></a-box>
+          <a-box position="0 0.04 0.07" width="0.05" height="0.30" depth="0.012" color="#DB6C74"></a-box>
+          <a-sphere position="0 -0.28 0" radius="0.085" color="#D36C7D"></a-sphere>
+          <a-box class="selectable" data-topic="thermometer" width="0.65" height="0.9" depth="0.50" material="color:#FFFFFF; opacity:0.01; transparent:true; depthWrite:false"></a-box>
+          <a-text value="TEMP" position="0 0.58 0.1" align="center" width="1.7" color="#1B7188"></a-text>
+        </a-entity>
       </a-entity>
 
-      <a-box
-        position="-1.8 0.7 -3.5"
-        width="2.4"
-        height="0.14"
-        depth="1"
-        color="#DDBF9F">
-      </a-box>
-
-      <a-box
-        position="-2.7 0.35 -3.5"
-        width="0.13"
-        height="0.7"
-        depth="0.13"
-        color="#FFFFFF">
-      </a-box>
-
-      <a-box
-        position="-0.9 0.35 -3.5"
-        width="0.13"
-        height="0.7"
-        depth="0.13"
-        color="#FFFFFF">
-      </a-box>
-
-      <a-entity
-        id="stethoscope"
-        position="-2.35 1.1 -3.4">
-
-        <a-torus
-          radius="0.2"
-          radius-tubular="0.028"
-          rotation="90 0 0"
-          color="#30566C">
-        </a-torus>
-
-        <a-cylinder
-          position="0 -0.22 0"
-          radius="0.04"
-          height="0.35"
-          color="#7E9BAA">
-        </a-cylinder>
-
-        <a-sphere
-          position="0 -0.43 0"
-          radius="0.12"
-          color="#B4C8D0">
-        </a-sphere>
-
-        <a-box
-          class="selectable"
-          data-topic="stethoscope"
-          width="0.7"
-          height="0.95"
-          depth="0.4"
-          material="color: #FFFFFF; opacity: 0.01; transparent: true; depthWrite: false">
-        </a-box>
-
-        <a-text
-          value="Stethoscope"
-          position="0 0.65 0"
-          align="center"
-          width="2"
-          color="#17566B">
-        </a-text>
-
+      <a-entity id="examBed" position="2.2 0 -3.6">
+        <a-box class="selectable" data-topic="bed" position="0 1.00 0" width="2.5" height="0.27" depth="1.25" color="#78B9C9"></a-box>
+        <a-box position="0 0.72 0" width="2.2" height="0.47" depth="1.02" color="#F6F9FB"></a-box>
+        <a-box position="-0.88 1.18 0" width="0.55" height="0.11" depth="0.85" color="#FFFFFF"></a-box>
+        <a-cylinder position="-0.95 0.26 -0.38" radius="0.055" height="0.53" color="#A5BDC7"></a-cylinder>
+        <a-cylinder position="0.95 0.26 0.38" radius="0.055" height="0.53" color="#A5BDC7"></a-cylinder>
+        <a-text value="EXAMINATION BED" position="0 1.70 0" width="3.7" align="center" color="#176A80"></a-text>
       </a-entity>
-
-      <a-entity
-        id="thermometer"
-        position="-1.25 1.1 -3.4">
-
-        <a-box
-          width="0.14"
-          height="0.6"
-          depth="0.12"
-          color="#FFFFFF">
-        </a-box>
-
-        <a-box
-          position="0 0.03 0.07"
-          width="0.045"
-          height="0.3"
-          depth="0.01"
-          color="#EF9292">
-        </a-box>
-
-        <a-sphere
-          position="0 -0.3 0"
-          radius="0.08"
-          color="#EF9292">
-        </a-sphere>
-
-        <a-box
-          class="selectable"
-          data-topic="thermometer"
-          width="0.55"
-          height="0.9"
-          depth="0.35"
-          material="color: #FFFFFF; opacity: 0.01; transparent: true; depthWrite: false">
-        </a-box>
-
-        <a-text
-          value="Thermometer"
-          position="0 0.65 0"
-          align="center"
-          width="2"
-          color="#17566B">
-        </a-text>
-
-      </a-entity>
-
-      <a-cylinder
-        position="3.6 0.48 -3.6"
-        radius="0.45"
-        height="0.18"
-        color="#8EBCD0">
-      </a-cylinder>
-
-      <a-box
-        position="3.6 0.9 -3.95"
-        width="0.8"
-        height="0.85"
-        depth="0.15"
-        color="#8EBCD0">
-      </a-box>
-
-      <a-text
-        id="objectInfo"
-        value="Look at a medical object to learn about it."
-        position="0 2.35 -5.7"
-        align="center"
-        width="4.6"
-        color="#286A7C">
-      </a-text>
-
+      <a-box position="4.6 1.08 -4.8" width="0.9" height="2.15" depth="0.5" color="#E8F4F7"></a-box>
+      <a-box position="4.6 1.83 -4.51" width="0.65" height="0.08" depth="0.07" color="#82BCCB"></a-box>
+      <a-box position="4.6 1.18 -4.51" width="0.65" height="0.08" depth="0.07" color="#82BCCB"></a-box>
+      <a-box position="4.6 0.56 -4.51" width="0.65" height="0.08" depth="0.07" color="#82BCCB"></a-box>
+      <a-box position="-4.55 1.00 -5.0" width="0.95" height="2.0" depth="0.55" color="#DCEEF4"></a-box>
+      <a-box position="-4.55 1.15 -4.69" width="0.75" height="0.29" depth="0.05" color="#91CED4"></a-box>
+      <a-box position="3.65 2.87 -5.77" width="1.85" height="1.18" depth="0.06" color="#FFFFFF"></a-box>
+      <a-text value="YOU CAN ASK\nFOR A PAUSE" position="3.65 2.86 -5.70" width="1.7" align="center" color="#1F7991"></a-text>
+      <a-box position="-3.85 2.86 -5.76" width="1.75" height="1.16" depth="0.06" color="#FFFFFF"></a-box>
+      <a-text value="DOCTORS EXPLAIN\nTHEIR TOOLS" position="-3.85 2.86 -5.67" width="1.55" align="center" color="#1F7991"></a-text>
     </a-entity>
 
     <a-entity id="finishState" visible="false">
-
-      <a-text
-        value="YOU DID IT!"
-        position="0 3.25 -5.75"
-        align="center"
-        width="6"
-        color="#176C86">
-      </a-text>
-
-      <a-text
-        value="A regular check-up can include:"
-        position="0 2.7 -5.73"
-        align="center"
-        width="4"
-        color="#286A7C">
-      </a-text>
-
-      <a-text
-        value="1. Saying hello to the doctor"
-        position="0 2.2 -5.73"
-        align="center"
-        width="4"
-        color="#315D70">
-      </a-text>
-
-      <a-text
-        value="2. Listening to your heartbeat"
-        position="0 1.7 -5.73"
-        align="center"
-        width="4"
-        color="#315D70">
-      </a-text>
-
-      <a-text
-        value="3. Checking your temperature"
-        position="0 1.2 -5.73"
-        align="center"
-        width="4"
-        color="#315D70">
-      </a-text>
-
-      <a-text
-        value="You can always ask questions."
-        position="0 0.7 -5.73"
-        align="center"
-        width="4"
-        color="#178A80">
-      </a-text>
-
-      <a-sphere
-        position="-2.5 1.5 -5.4"
-        radius="0.35"
-        color="#F6CE83"
-        animation="property: position; to: -2.5 1.8 -5.4; dir: alternate; dur: 1400; loop: true">
-      </a-sphere>
-
-      <a-sphere
-        position="2.5 1.5 -5.4"
-        radius="0.35"
-        color="#F4ADC5"
-        animation="property: position; to: 2.5 1.8 -5.4; dir: alternate; dur: 1600; loop: true">
-      </a-sphere>
-
+      <a-box position="0 2.55 -5.82" width="7.6" height="2.15" depth="0.06" color="#F2E7F8"></a-box>
+      <a-text value="READY FOR YOUR CHECK-UP?" position="0 3.32 -5.71" width="6.8" align="center" color="#6B5286"></a-text>
+      <a-text id="quizQuestion" value="Which tool listens to your heartbeat?" position="0 2.70 -5.69" width="5.2" wrap-count="34" align="center" color="#543E76"></a-text>
+      <a-text id="quizProgress" value="QUESTION 1 OF 3" position="0 2.16 -5.68" width="3.5" align="center" color="#795DA1"></a-text>
+      <a-entity id="quizChoices" position="0 0 -3.7">
+        <a-plane class="selectable" data-answer="0" position="-1.45 1.42 0" width="1.35" height="0.78" color="#8B6DB1"></a-plane>
+        <a-text id="quizAnswer0" value="STETHOSCOPE" position="-1.45 1.42 0.025" width="1.15" wrap-count="24" align="center" color="#FFFFFF"></a-text>
+        <a-plane class="selectable" data-answer="1" position="0 1.42 0" width="1.35" height="0.78" color="#8B6DB1"></a-plane>
+        <a-text id="quizAnswer1" value="THERMOMETER" position="0 1.42 0.025" width="1.15" wrap-count="24" align="center" color="#FFFFFF"></a-text>
+        <a-plane class="selectable" data-answer="2" position="1.45 1.42 0" width="1.35" height="0.78" color="#8B6DB1"></a-plane>
+        <a-text id="quizAnswer2" value="EXAM BED" position="1.45 1.42 0.025" width="1.15" wrap-count="24" align="center" color="#FFFFFF"></a-text>
+      </a-entity>
+      <a-text id="quizFeedback" value="Look at an answer to choose it." position="0 0.80 -3.7" width="5.0" align="center" wrap-count="40" color="#5A4980"></a-text>
+      <a-plane id="restartVR" class="selectable" data-action="restart" position="0 0.48 -4.8" width="1.9" height="0.38" color="#708B9C" visible="false"></a-plane>
+      <a-text id="restartLabel" value="START AGAIN" position="0 0.48 -4.77" width="2.8" align="center" color="#FFFFFF" visible="false"></a-text>
+      <a-box position="-4.7 0.62 -4.65" width="1.35" height="0.26" depth="0.86" color="#B6A5CF"></a-box>
+      <a-box position="-4.7 1.03 -4.98" width="1.35" height="0.71" depth="0.16" color="#B6A5CF"></a-box>
+      <a-box position="4.7 0.62 -4.65" width="1.35" height="0.26" depth="0.86" color="#B6A5CF"></a-box>
+      <a-box position="4.7 1.03 -4.98" width="1.35" height="0.71" depth="0.16" color="#B6A5CF"></a-box>
+      <a-sphere position="-3.75 2.62 -5.55" radius="0.27" color="#F1C56F" animation="property:position;to:-3.75 2.9 -5.55;dir:alternate;dur:1400;loop:true"></a-sphere>
+      <a-sphere position="3.75 2.62 -5.55" radius="0.27" color="#E3A6C0" animation="property:position;to:3.75 2.9 -5.55;dir:alternate;dur:1550;loop:true"></a-sphere>
     </a-entity>
 
-    <a-entity id="guideModel" position="-3.7 0 -4.8">
+    <a-entity id="guideModel" gltf-model="url(./assets/models/RobotExpressive.glb)" animation-mixer="clip: Wave; loop: repeat" position="-2.50 0 -2.65" scale="0.38 0.38 0.38" rotation="0 20 0"></a-entity>
+
+    <a-entity id="navigation" position="0 -0.2 -1.6">
+      <a-plane id="backVR" class="selectable" data-action="back" position="-0.8 0.55 0" width="1.15" height="0.38" color="#668D9D" visible="false"></a-plane>
+      <a-text id="backVRLabel" value="BACK" position="-0.8 0.55 0.026" width="2.1" align="center" color="#FFFFFF" visible="false"></a-text>
+      <a-plane id="nextVR" class="selectable" data-action="next" position="0.8 0.55 0" width="1.15" height="0.38" color="#197F97"></a-plane>
+      <a-text id="nextVRLabel" value="NEXT" position="0.8 0.55 0.026" width="2.1" align="center" color="#FFFFFF"></a-text>
     </a-entity>
 
-    
-<a-entity id="navigation" position="0 -0.35 -1.8">
-
-
-      <a-plane
-        id="backVR"
-        class="selectable"
-        data-action="back"
-        position="-0.85 0.95 0"
-        width="1.2"
-        height="0.43"
-        color="#6F98A6"
-        visible="false">
-      </a-plane>
-
-      <a-text
-        id="backVRLabel"
-        value="BACK"
-        position="-0.85 0.95 0.02"
-        align="center"
-        width="2.3"
-        color="#FFFFFF"
-        visible="false">
-      </a-text>
-
-      <a-plane
-        id="nextVR"
-        class="selectable"
-        data-action="next"
-        position="0.85 0.95 0"
-        width="1.2"
-        height="0.43"
-        color="#20859E">
-      </a-plane>
-
-      <a-text
-        id="nextVRLabel"
-        value="NEXT"
-        position="0.85 0.95 0.02"
-        align="center"
-        width="2.3"
-        color="#FFFFFF">
-      </a-text>
-
-    </a-entity>
-
-   
-<a-entity id="guidePanel" position="4.4 0 -3.5" rotation="0 -55 0">
-
-
-      <a-plane
-        position="0 2.05 0"
-        width="3.7"
-        height="0.9"
-        color="#FFFFFF"
-        material="opacity: 0.94; transparent: true">
-      </a-plane>
-
-      <a-text
-        id="vrResponse"
-        value="Ask about a stethoscope, thermometer, or check-up."
-        position="0 2.12 0.02"
-        align="center"
-        width="3.2"
-        wrap-count="45"
-        color="#23566A">
-      </a-text>
-
-      <a-plane
-        id="voiceVR"
-        class="selectable"
-        data-action="speak"
-        position="0 1.34 0"
-        width="1.8"
-        height="0.42"
-        color="#20859E">
-      </a-plane>
-
-      <a-text
-        value="ASK BY VOICE"
-        position="0 1.34 0.02"
-        align="center"
-        width="2.7"
-        color="#FFFFFF">
-      </a-text>
-
+    <a-entity id="guidePanel" position="4.10 0 -4.15" rotation="0 -36 0">
+      <a-plane position="0 2.40 0" width="2.45" height="1.18" color="#FFFFFF" material="opacity:0.98; transparent:true"></a-plane>
+      <a-text value="CLINIC GUIDE" position="0 2.85 0.025" width="3.0" align="center" color="#19738A"></a-text>
+      <a-text id="vrResponse" value="Ask about a check-up, stethoscope or thermometer." position="0 2.33 0.028" width="2.20" wrap-count="29" align="center" color="#264F64"></a-text>
+      <a-plane id="voiceVR" class="selectable" data-action="speak" position="0 1.50 0" width="2.2" height="0.34" color="#197F97"></a-plane>
+      <a-text value="ASK BY VOICE" position="0 1.50 0.027" width="2.45" align="center" color="#FFFFFF"></a-text>
+      <a-text value="OR PICK A TOPIC" position="0 1.17 0.025" width="2.2" align="center" color="#2C6477"></a-text>
+      <a-plane class="selectable" data-manual="stethoscope" position="-0.79 0.82 0" width="0.72" height="0.34" color="#577D95"></a-plane>
+      <a-text value="HEART" position="-0.79 0.82 0.023" width="1.25" align="center" color="#FFFFFF"></a-text>
+      <a-plane class="selectable" data-manual="thermometer" position="0 0.82 0" width="0.72" height="0.34" color="#577D95"></a-plane>
+      <a-text value="TEMP" position="0 0.82 0.023" width="1.25" align="center" color="#FFFFFF"></a-text>
+      <a-plane class="selectable" data-manual="checkup" position="0.79 0.82 0" width="0.72" height="0.34" color="#577D95"></a-plane>
+      <a-text value="VISIT" position="0.79 0.82 0.023" width="1.25" align="center" color="#FFFFFF"></a-text>
     </a-entity>
 
     <a-entity id="player" position="0 0 2.5">
-
-      <a-camera
-        position="0 1.6 0"
-        look-controls="enabled: true"
-        wasd-controls="enabled: false">
-
-        <a-entity
-          cursor="fuse: true; fuseTimeout: 1500"
-          raycaster="objects: .selectable; far: 12"
-          position="0 0 -1"
-          geometry="primitive: ring; radiusInner: 0.012; radiusOuter: 0.02"
-          material="color: #20859E; shader: flat">
-        </a-entity>
-
+      <a-camera position="0 1.6 0" look-controls="enabled: true" wasd-controls="enabled: false">
+        <a-entity cursor="fuse: true; fuseTimeout: 800" raycaster="objects: .selectable; far: 12" position="0 0 -1" geometry="primitive: ring; radiusInner: 0.012; radiusOuter: 0.021" material="color: #E9AC46; shader: flat"></a-entity>
       </a-camera>
-
     </a-entity>
-
   </a-scene>
-
   <script src="./js/scene.js"></script>
   <script src="./js/ai-guide.js"></script>
-
 </body>
 </html>
