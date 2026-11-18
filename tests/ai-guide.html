@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clinic Guide — Evaluation</title>
+  <style>
+    body {
+      margin: 0 auto;
+      max-width: 1100px;
+      padding: 28px;
+      font: 16px/1.5 Arial, sans-serif;
+      color: #183b49;
+      background: #eef6f8;
+    }
+    h1, h2 { color: #176c86; }
+    section {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 18px 0;
+    }
+    button {
+      padding: 12px 18px;
+      margin: 5px;
+      border: 0;
+      border-radius: 7px;
+      background: #176c86;
+      color: white;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .5; cursor: default; }
+    input { padding: 10px; width: min(95%, 600px); }
+    .controls { display: flex; gap: 6px; flex-wrap: wrap; }
+    .scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      text-align: left;
+      border-bottom: 1px solid #ccdce0;
+      padding: 9px;
+      vertical-align: top;
+    }
+    #mode { font-weight: bold; }
+    #aiResponse { padding: 12px; background: #e8f3f6; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <h1>Clinic Guide — Evaluation</h1>
+  <p>
+    Developer evaluation, not a user study.
+    Only predefined synthetic questions are exported.
+    No microphone is used on this page.
+  </p>
+
+  <p>
+    <a href="./ai-guide.html">Normal evaluation</a> |
+    <a href="./ai-guide.html?simulate=model-failure">
+      Simulated model-load failure
+    </a>
+  </p>
+
+  <section>
+    <p id="mode"></p>
+    <label for="build">Tested build / commit and local changes:</label><br>
+    <input id="build"
+      placeholder="Example: 4501a85 + pinned-model/evaluation changes">
+    <p>
+      Run once and preserve the first result, including failures.
+      Model initialization is measured separately from warmed-up questions.
+      Initialization may use the browser cache.
+    </p>
+    <button id="run">Run evaluation</button>
+    <button id="download" disabled>Download JSON</button>
+    <p id="progress" role="status">Ready.</p>
+  </section>
+
+  <section>
+    <h2>Guide output</h2>
+    <div id="aiResponse" role="status" aria-live="polite"></div>
+  </section>
+
+  <section>
+    <h2>Results</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Question / check</th>
+            <th>Expected</th>
+            <th>Actual</th>
+            <th>Result</th>
+            <th>Time, ms</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <pre id="summary"></pre>
+  </section>
+
+  <script src="../js/ai-guide.js"></script>
+  <script>
+    "use strict";
+
+    // Evaluation set v1: separate from reference examples
+    // and the ten earlier development questions.
+    // If used for tuning later, it is no longer a held-out test.
+    const CASES = [
+      ["S1", "What does a stethoscope help a doctor hear?", "stethoscope"],
+      ["S2", "How can the doctor listen to the sounds of my lungs?", "stethoscope"],
+      ["S3", "Tell me about the doctor's chest listening instrument.", "stethoscope"],
+      ["S4", "Why is a stethoscope used during an examination?", "stethoscope"],
+
+      ["T1", "What is the purpose of a thermometer at the clinic?", "thermometer"],
+      ["T2", "How is my body temperature measured at the clinic?", "thermometer"],
+      ["T3", "Explain the tool used to take my temperature.", "thermometer"],
+      ["T4", "What does the thermometer tell the doctor?", "thermometer"],
+
+      ["C1", "Describe a normal check-up for a child.", "checkup"],
+      ["C2", "What are the steps of a routine medical examination?", "checkup"],
+      ["C3", "What usually takes place at a regular health check?", "checkup"],
+      ["C4", "Can I request a break in my routine examination?", "checkup"],
+
+      ["U1", "Which planet is closest to the sun?", "unknown"],
+      ["U2", "How can I repair my bicycle?", "unknown"],
+      ["U3", "What dose of medicine should a child take?", "unknown"],
+      ["U4", "Can you diagnose the cause of my stomach pain?", "unknown"]
+    ];
+
+    const $ = id => document.getElementById(id);
+    const info = window.ClinicGuide.getInfo();
+    const simulated = info.simulatedFailure;
+    let report = null;
+
+    $("mode").textContent = simulated
+      ? "SIMULATION: model initialization deliberately throws an error."
+      : "NORMAL MODE: real model inference on 16 predefined questions.";
+
+    function addRow(row) {
+      const tr = document.createElement("tr");
+      [
+        row.id,
+        row.question,
+        row.expected,
+        row.actual,
+        row.pass ? "PASS" : "FAIL",
+        row.elapsedMs ?? ""
+      ].forEach(value => {
+        const td = document.createElement("td");
+        td.textContent = String(value);
+        tr.appendChild(td);
+      });
+      $("rows").appendChild(tr);
+    }
+
+    function saveRow(row) {
+      report.rows.push(row);
+      addRow(row);
+    }
+
+    $("run").addEventListener("click", async () => {
+      const build = $("build").value.trim();
+      if (!build) {
+        $("progress").textContent =
+          "Enter the tested build description first.";
+        return;
+      }
+
+      $("run").disabled = true;
+      $("download").disabled = true;
+      $("build").disabled = true;
+      $("rows").replaceChildren();
+      $("summary").textContent = "";
+
+      // Prevent manual actions from interrupting the automated run.
+      document.querySelectorAll("#guideManualTopics button")
+        .forEach(button => button.disabled = true);
+
+      report = {
+        schemaVersion: 1,
+        suite: simulated ? "simulated-failure-v1" : "semantic-evaluation-v1",
+        startedAt: new Date().toISOString(),
+        build,
+        browser: navigator.userAgent,
+        executionContext: "Standalone desktop test page; no VR scene",
+        model: window.ClinicGuide.getInfo(),
+        timingNote:
+          "Initialization measured separately; question times are warm. " +
+          "Cache state is not controlled. No human task time is measured.",
+        rows: []
+      };
+
+      try {
+        if (simulated) {
+          $("progress").textContent = "Testing simulated failure...";
+
+          const failed = await ClinicGuide.ask("What is a thermometer?");
+          saveRow({
+            id: "F1",
+            question: "Ask after simulated model initialization failure",
+            expected: "unavailable",
+            actual: failed.status,
+            pass: failed.status === "unavailable",
+            elapsedMs: failed.elapsedMs,
+            answer: failed.answer,
+            simulatedFailure: failed.simulatedFailure
+          });
+
+          const manual = ClinicGuide.chooseTopic("thermometer");
+          const visibleAnswer = $("aiResponse").textContent;
+
+          saveRow({
+            id: "F2",
+            question: "Manual thermometer topic after simulated failure",
+            expected: "manual thermometer answer visible",
+            actual: manual?.status + " / " + manual?.topic,
+            pass:
+              manual?.status === "manual" &&
+              manual?.topic === "thermometer" &&
+              visibleAnswer === manual.answer,
+            answer: manual?.answer
+          });
+
+          report.summary = {
+            passed: report.rows.filter(row => row.pass).length,
+            total: report.rows.length,
+            limitation:
+              "Injected initialization error, not a real network outage. " +
+              "Manual fallback tested through the same API used by its buttons."
+          };
+        } else {
+          $("progress").textContent =
+            "Initializing the pinned model. Please keep this tab open.";
+
+          const initStart = performance.now();
+          await ClinicGuide.init();
+          report.initializationMs =
+            Math.round(performance.now() - initStart);
+
+          for (const [index, item] of CASES.entries()) {
+            const [id, question, expected] = item;
+            $("progress").textContent =
+              `Question ${index + 1} of ${CASES.length}`;
+
+            const result = await ClinicGuide.ask(question);
+            const actual = result.status === "answered"
+              ? result.topic
+              : result.status;
+
+            saveRow({
+              id,
+              question,
+              expected,
+              actual,
+              pass: actual === expected,
+              status: result.status,
+              answer: result.answer,
+              similarity: result.similarity ?? null,
+              margin: result.margin ?? null,
+              elapsedMs: result.elapsedMs ?? null,
+              inferenceMs: result.inferenceMs ?? null
+            });
+          }
+
+          const passed = report.rows.filter(row => row.pass).length;
+          const inScope = report.rows.filter(
+            row => row.expected !== "unknown"
+          );
+          const outScope = report.rows.filter(
+            row => row.expected === "unknown"
+          );
+
+          const times = report.rows
+            .filter(row =>
+              ["answered", "unknown"].includes(row.status) &&
+              Number.isFinite(row.elapsedMs)
+            )
+            .map(row => row.elapsedMs)
+            .sort((a, b) => a - b);
+
+          const middle = Math.floor(times.length / 2);
+          const median = !times.length ? null :
+            times.length % 2
+              ? times[middle]
+              : (times[middle - 1] + times[middle]) / 2;
+
+          report.summary = {
+            passed,
+            total: CASES.length,
+            accuracyOnThisSetPercent:
+              Number((100 * passed / CASES.length).toFixed(1)),
+            inScopeCorrect: inScope.filter(row => row.pass).length,
+            inScopeTotal: inScope.length,
+            outOfScopeRejected: outScope.filter(row => row.pass).length,
+            outOfScopeTotal: outScope.length,
+            medianWarmResponseMs: median,
+            completedInferenceCount: times.length,
+            limitation:
+              "Small author-designed English text set. " +
+              "Not speech accuracy, a user study, or evidence of clinical benefit."
+          };
+        }
+
+        report.completed = true;
+        $("progress").textContent =
+          "Finished. Download JSON before leaving this page.";
+      } catch (error) {
+        report.completed = false;
+        report.error = {
+          name: error.name,
+          message: error.message
+        };
+        $("progress").textContent =
+          "Evaluation stopped. Download the error report and share it.";
+      } finally {
+        report.finishedAt = new Date().toISOString();
+        $("summary").textContent =
+          JSON.stringify(report.summary || report.error, null, 2);
+        $("download").disabled = false;
+        document.querySelectorAll("#guideManualTopics button")
+          .forEach(button => button.disabled = false);
+      }
+    });
+
+    $("download").addEventListener("click", () => {
+      if (!report) return;
+
+      const blob = new Blob(
+        [JSON.stringify(report, null, 2)],
+        { type: "application/json" }
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download =
+        report.suite + "-" +
+        new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+  </script>
+</body>
+</html>

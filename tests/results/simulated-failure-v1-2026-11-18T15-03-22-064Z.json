@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "suite": "simulated-failure-v1",
+  "startedAt": "2026-11-18T15:02:43.788Z",
+  "build": "4501a85 + local pinned-model and evaluation changes",
+  "browser": "Mozilla/5.0 (X11; Linux x86_64; Quest 3) AppleWebKit/537.36 (KHTML, like Gecko) OculusBrowser/33.0.0.x.x.x Chrome/126.0.6478.122 VR Safari/537.36",
+  "executionContext": "Standalone desktop test page; no VR scene",
+  "model": {
+    "model": "Xenova/all-MiniLM-L6-v2",
+    "revision": "751bff37182d3f1213fa05d7196b954e230abad9",
+    "libraryVersion": "2.17.2",
+    "minSimilarity": 0.45,
+    "minMargin": 0.06,
+    "modelReady": false,
+    "busy": false,
+    "simulatedFailure": true
+  },
+  "timingNote": "Initialization measured separately; question times are warm. Cache state is not controlled. No human task time is measured.",
+  "rows": [
+    {
+      "id": "F1",
+      "question": "Ask after simulated model initialization failure",
+      "expected": "unavailable",
+      "actual": "unavailable",
+      "pass": true,
+      "elapsedMs": 1,
+      "answer": "The AI guide is unavailable or is still downloading. Please choose a topic below, or try Ask again later.",
+      "simulatedFailure": true
+    },
+    {
+      "id": "F2",
+      "question": "Manual thermometer topic after simulated failure",
+      "expected": "manual thermometer answer visible",
+      "actual": "manual / thermometer",
+      "pass": true,
+      "answer": "A thermometer measures your body temperature. The doctor can explain how they will use it before they begin."
+    }
+  ],
+  "summary": {
+    "passed": 2,
+    "total": 2,
+    "limitation": "Injected initialization error, not a real network outage. Manual fallback tested through the same API used by its buttons."
+  },
+  "completed": true,
+  "finishedAt": "2026-11-18T15:02:43.790Z"
+}
