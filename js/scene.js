@@ -417,19 +417,27 @@ function decorativeDoor(parent, position) {
 
 function medicalCart(parent, position) {
   const cart = group(parent, position);
+  cart.setAttribute("rotation", "0 90 0");
 
   // Cart top and lower shelf.
   box(cart, "0 0.92 0", "1.3 0.1 0.58", "#FFFFFF");
-  box(cart, "0 0.42 0", "1.15 0.08 0.5", "#D7EEEF");
+  box(cart, "0 0.38 0", "1.15 0.08 0.5", "#D7EEEF");
 
-  // Four legs.
+  // Four legs now reach down close to the floor.
   [-0.52, 0.52].forEach(x => {
     [-0.2, 0.2].forEach(z => {
-      box(cart, `${x} 0.63 ${z}`, "0.07 0.58 0.07", "#9BAEB8");
+      box(cart, `${x} 0.47 ${z}`, "0.07 0.82 0.07", "#9BAEB8");
+
+      shape(cart, "a-cylinder", {
+        position: `${x} 0.08 ${z}`,
+        radius: 0.08,
+        height: 0.05,
+        rotation: "90 0 0"
+      }, "#536E7A");
     });
   });
 
-  // Tray and small pretend clinic supplies.
+  // Tray and pretend clinic supplies.
   box(cart, "-0.18 1.02 0", "0.52 0.035 0.32", "#BEDDD1");
 
   shape(cart, "a-cylinder", {
@@ -446,9 +454,40 @@ function medicalCart(parent, position) {
 
   box(cart, "0.37 1.08 0", "0.2 0.1 0.2", "#F6F3FF");
 }
+function medicalCabinet(parent, position) {
+  const cabinet = group(parent, position);
+  cabinet.setAttribute("rotation", "0 90 0");
 
+  // Cabinet body sits directly on the floor.
+  box(cabinet, "0 1.05 0", "1.0 2.1 0.48", "#EDF6F4");
+  box(cabinet, "0 0.12 0.02", "1.08 0.16 0.56", "#9BAEB8");
+  box(cabinet, "0 2.12 0", "1.12 0.12 0.58", "#FFFFFF");
+
+  // Two pale glass doors and small handles.
+  panel(cabinet, "-0.24 1.18 0.25", 0.38, 1.55, "#D7EEEF");
+  panel(cabinet, "0.24 1.18 0.25", 0.38, 1.55, "#D7EEEF");
+
+  box(cabinet, "0 1.18 0.28", "0.035 1.6 0.04", "#A7CBCD");
+
+  shape(cabinet, "a-sphere", {
+    position: "-0.05 1.15 0.3",
+    radius: 0.035
+  }, "#E8A434");
+
+  shape(cabinet, "a-sphere", {
+    position: "0.05 1.15 0.3",
+    radius: 0.035
+  }, "#E8A434");
+
+  // Visible supplies on the shelves behind the glass.
+  box(cabinet, "-0.23 0.75 0.12", "0.16 0.28 0.12", "#73BBB4");
+  box(cabinet, "0.22 0.75 0.12", "0.16 0.28 0.12", "#F2C56A");
+  box(cabinet, "-0.22 1.55 0.12", "0.18 0.3 0.12", "#AE98CF");
+  box(cabinet, "0.2 1.55 0.12", "0.18 0.3 0.12", "#EAAE82");
+}
 function finishShelf(parent, position) {
   const shelf = group(parent, position);
+  shelf.setAttribute("rotation", "0 90 0");
 
   box(shelf, "0 0.72 0", "1.15 1.44 0.12", "#E7C998");
   box(shelf, "0 0.18 0.1", "1.3 0.12 0.35", "#FFFFFF");
@@ -463,6 +502,24 @@ function finishShelf(parent, position) {
   box(shelf, "-0.32 1.06 0.12", "0.18 0.42 0.2", "#F2C56A");
   box(shelf, "-0.1 1.06 0.12", "0.18 0.42 0.2", "#73BBB4");
   box(shelf, "0.14 1.06 0.12", "0.18 0.42 0.2", "#AE98CF");
+}
+function sideWindow(parent, position) {
+  const windowGroup = group(parent, position);
+  windowGroup.setAttribute("rotation", "0 90 0");
+
+  // Window frame and blue glass.
+  box(windowGroup, "0 0 0", "1.65 1.4 0.1", "#F3E2C5");
+  panel(windowGroup, "0 0 0.06", 1.48, 1.22, "#AFE3F6");
+
+  // Window dividers.
+  box(windowGroup, "0 0 0.1", "0.055 1.22 0.05", "#FFFFFF");
+  box(windowGroup, "0 0 0.1", "1.48 0.055 0.05", "#FFFFFF");
+
+  // A small sun detail.
+  shape(windowGroup, "a-circle", {
+    position: "0.42 0.32 0.13",
+    radius: 0.12
+  }, "#FFD66D");
 }
   // Room surfaces receive shadows but do not block the room's light.
   function architecture(parent, position, size, color, kind) {
@@ -526,6 +583,8 @@ function finishShelf(parent, position) {
     const [welcome, exam, finish] = groups;
 
     // Welcome room.
+    sideWindow(welcome, "-5.88 2.7 -0.3");
+plant(welcome, "-4.8 0 2.8");
     decorativeDoor(welcome, "-5.82 0 1.8");
     panel(welcome, "0 3.62 -4.7", 4.7, 0.92, "#FFFFFF");
     text(welcome, "WELCOME, LITTLE EXPLORER!", "0 3.85 -4.66", 4.3, 35, C.teal);
@@ -607,8 +666,11 @@ Next stop: the examination room`);
     }, "#A4B9BE");
 
     // Examination room.
+    sideWindow(exam, "-5.88 2.7 -0.3");
+plant(exam, "-5 0 4.8");
     decorativeDoor(exam, "-5.82 0 1.8");
-medicalCart(exam, "-4.55 0 -0.55");
+medicalCart(exam, "-5.55 0 0.15");
+medicalCabinet(exam, "-5.55 0 4.0");
     panel(exam, "0 3.62 -4.7", 4.7, 0.92, "#FFFFFF");
     text(exam, "DISCOVER THE EXAMINATION ROOM", "0 3.85 -4.66", 4.3, 39, C.teal);
     text(exam, "Two instruments on the left. A bed on the right.", "0 3.42 -4.66", 4.3, 46);
@@ -761,7 +823,9 @@ medicalCart(exam, "-4.55 0 -0.55");
     }, "#9BAEB8");
 
     // Finish room: furniture surrounds a wall-mounted quiz display.
-    finishShelf(finish, "-5.05 0 -1.8");
+    plant(finish, "-5.0 0 4.8");
+    decorativeDoor(finish, "-5.82 0 1.8");
+    finishShelf(finish, "-5.65 0 -0.2");
     bench(finish, "-4 0 -3.8", "#B3A0D0");
     bench(finish, "3.7 0 -4", "#E6B092");
 
